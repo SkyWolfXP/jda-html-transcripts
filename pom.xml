@@ -14,27 +14,14 @@
                 <artifactId>site-maven-plugin</artifactId>
                 <version>0.12</version>
                 <configuration>
-                    <message>Maven artifacts for ${project.version}</message>
-                    <noJekyll>true</noJekyll>
-                    <outputDirectory>${project.build.directory}</outputDirectory>
-                    <!--suppress UnresolvedMavenProperty -->
-                    <branch>refs/heads/${branch-name}</branch>
-                    <includes>
-                        <include>**/*</include>
-                    </includes>
-                    <merge>true</merge>
-                    <!--suppress UnresolvedMavenProperty -->
-                    <repositoryName>${repository-name}</repositoryName>
-                    <!--suppress UnresolvedMavenProperty -->
-                    <repositoryOwner>${repository-owner}</repositoryOwner>
-                    <server>github</server>
+                    <message>Creating site for ${project.version}</message>
                 </configuration>
                 <executions>
                     <execution>
                         <goals>
                             <goal>site</goal>
                         </goals>
-                        <phase>deploy</phase>
+                        <phase>site</phase>
                     </execution>
                 </executions>
             </plugin>

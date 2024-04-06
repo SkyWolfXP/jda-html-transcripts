@@ -1,6 +1,6 @@
 # Discord JDA HTML Transcripts
 
-![Discord](https://img.shields.io/discord/1055244032105787472?style=flat-square&label=Discord&labelColor=%235865f2&link=https%3A%2F%2Fdiscord.gg%2FQmYE4Gngxz)
+![Discord](https://img.shields.io/discord/1055244032105787472?label=Discord&labelColor=%235865f2&link=https%3A%2F%2Fdiscord.gg%2FQmYE4Gngxz)
 [![](https://jitpack.io/v/SkyWolfXP/JDA-HTML-Transcripts.svg)](https://jitpack.io/#SkyWolfXP/JDA-HTML-Transcripts)
 
 Discord HTML Transcripts is a node.js module (recode on JDA) to generate nice looking HTML transcripts. Processes
@@ -16,8 +16,8 @@ HTML Template stolen from [DiscordChatExporter](https://github.com/Tyrrrz/Discor
 ```xml
 <repositories>
     <repository>
-	<id>jitpack.io</id>
-	<url>https://jitpack.io</url>
+        <id>jitpack.io</id>
+        <url>https://jitpack.io</url>
     </repository>
 </repositories>
 ```

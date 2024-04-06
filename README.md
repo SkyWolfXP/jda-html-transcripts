@@ -1,4 +1,4 @@
-# Discord (JDA) HTML Transcripts
+# Discord JDA HTML Transcripts
 [![Discord](https://img.shields.io/discord/555474311637499955?label=discord)](https://discord.gg/rf5qN7C)
 [![](https://jitpack.io/v/Ryzeon/discord-html-transcripts.svg)](https://jitpack.io/#Ryzeon/discord-html-transcripts)
 
@@ -21,7 +21,7 @@ HTML Template stolen from [DiscordChatExporter](https://github.com/Tyrrrz/Discor
 
 ```xml
 <dependency>
-    <groupId>com.github.Ryzeon</groupId>
+    <groupId>org.github.SkyWolfXP</groupId>
     <artifactId>discord-html-transcripts</artifactId>
     <version>Tag</version>
 </dependency>
@@ -44,4 +44,3 @@ DiscordHtmlTranscripts transcript = DiscordHtmlTranscripts.getInstance();
 
 transcript.generateFromMessages(messages); // return to InputStream
 ```
-

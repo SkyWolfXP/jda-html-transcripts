@@ -1,4 +1,4 @@
-package org.skywolfxp.transcripts;
+package com.skywolfxp.transcripts;
 
 import java.awt.*;
 import java.util.regex.Matcher;

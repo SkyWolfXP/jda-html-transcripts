@@ -11,7 +11,6 @@ import java.io.File;
 import java.io.IOException;
 import java.net.URL;
 import java.time.format.DateTimeFormatter;
-import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
@@ -22,13 +21,9 @@ import java.util.Objects;
  */
 public class Transcript
 {
-  
-  private final List<String>
-          imageFormats = Arrays.asList("png", "jpg", "jpeg", "gif"),
-          videoFormats = Arrays.asList("mp4", "webm", "mkv", "avi", "mov", "flv", "wmv", "mpg", "mpeg"),
-          audioFormats = Arrays.asList("mp3", "wav", "ogg", "flac");
-  
-  
+  private static final List<String> VIDEO_FORMATS = List.of("mp4", "webm", "mkv", "avi", "mov", "flv", "wmv", "mpg", "mpeg");
+  private static final List<String> IMAGE_FORMATS = List.of("png", "jpg", "jpeg", "gif");
+  private static final List<String> AUDIO_FORMATS = List.of("mp3", "wav", "ogg", "flac");
   private static final Transcript TRANSCRIPT = new Transcript();
   
   public static Transcript getTranscript()
@@ -36,18 +31,18 @@ public class Transcript
     return TRANSCRIPT;
   }
   
-  public void createTranscript(TextChannel channel) throws IOException
+  public FileUpload createTranscript(TextChannel textChannel) throws IOException
   {
-    createTranscript(channel, null);
+    return FileUpload.fromData(generateFromMessages(textChannel.getIterableHistory().stream().toList()), "transcript.html");
   }
   
-  public void createTranscript(TextChannel channel, String fileName) throws IOException
+  public FileUpload createTranscript(TextChannel textChannel, String fileName) throws IOException
   {
-    channel.sendFiles(generateFromMessages(channel.getIterableHistory().stream().toList(), fileName != null ? fileName : "transcript.html"))
-           .queue();
+    return FileUpload.fromData(
+            generateFromMessages(textChannel.getIterableHistory().stream().toList()), fileName != null ? fileName : "transcript.html");
   }
   
-  public FileUpload generateFromMessages(List<Message> messages, String fileName) throws IOException
+  public static byte[] generateFromMessages(List<Message> messages) throws IOException
   {
     File htmlTemplate = findFile("template.html");
     
@@ -182,7 +177,7 @@ public class Transcript
           attachmentsDiv.addClass("chatlog__attachment");
           
           String attachmentType = attach.getFileExtension();
-          if (imageFormats.contains(attachmentType))
+          if (IMAGE_FORMATS.contains(attachmentType))
           {
             Element attachmentLink = document.createElement("a");
             
@@ -198,7 +193,7 @@ public class Transcript
             attachmentLink.appendChild(attachmentImage);
             attachmentsDiv.appendChild(attachmentLink);
           }
-          else if (videoFormats.contains(attachmentType))
+          else if (VIDEO_FORMATS.contains(attachmentType))
           {
             Element attachmentVideo = document.createElement("video");
             attachmentVideo.addClass("chatlog__attachment-media");
@@ -211,7 +206,7 @@ public class Transcript
             
             attachmentsDiv.appendChild(attachmentVideo);
           }
-          else if (audioFormats.contains(attachmentType))
+          else if (AUDIO_FORMATS.contains(attachmentType))
           {
             Element attachmentAudio = document.createElement("audio");
             attachmentAudio.addClass("chatlog__attachment-media");
@@ -506,16 +501,15 @@ public class Transcript
       chatLog.appendChild(messageGroup);
     }
     
-    return FileUpload.fromData(document.outerHtml().getBytes(), fileName);
+    return document.outerHtml().getBytes();
   }
   
-  private File findFile(String fileName)
+  private static File findFile(String fileName)
   {
-    URL url = getClass().getClassLoader().getResource(fileName);
-    if (url == null)
-    {
-      throw new IllegalArgumentException("file is not found: " + fileName);
-    }
+    URL url = Transcript.class.getClassLoader().getResource(fileName);
+    
+    if (url == null) {throw new IllegalArgumentException("file is not found: " + fileName);}
+    
     return new File(url.getFile());
   }
 }

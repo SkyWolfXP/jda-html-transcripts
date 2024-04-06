@@ -101,7 +101,7 @@ public class Formatter
     String hex = Integer.toHexString(color.getRGB() & 0xffffff);
     while (hex.length() < 6)
     {
-      hex = "0" + hex;
+      hex = "0%s".formatted(hex);
     }
     return hex;
   }

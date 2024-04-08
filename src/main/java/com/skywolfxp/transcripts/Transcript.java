@@ -7,9 +7,8 @@ import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 
-import java.io.File;
 import java.io.IOException;
-import java.net.URL;
+import java.io.InputStream;
 import java.time.format.DateTimeFormatter;
 import java.util.Comparator;
 import java.util.List;
@@ -44,15 +43,13 @@ public class Transcript
   
   public byte[] generateFromMessages(List<Message> messages) throws IOException
   {
-    URL resource = this.getClass().getClassLoader().getResource("template.html");
+    InputStream resource = getClass().getClassLoader().getResourceAsStream("template.html");
     
     if (messages.isEmpty()) {throw new IllegalArgumentException("No messages to generate a transcript from");}
     if (resource == null) {throw new IllegalArgumentException("Template File Can't Be Found.");}
     
-    File htmlTemplate = new File(resource.getFile());
-    
     TextChannel channel = messages.iterator().next().getChannel().asTextChannel();
-    Document document = Jsoup.parse(htmlTemplate, "UTF-8");
+    Document document = Jsoup.parse(resource, "UTF-8", "");
     document.outputSettings().indentAmount(0).prettyPrint(true);
     document.getElementsByClass("preamble__guild-icon")
             .first().attr("src", channel.getGuild().getIconUrl()); // set guild icon

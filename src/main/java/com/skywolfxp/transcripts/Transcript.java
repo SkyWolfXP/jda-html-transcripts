@@ -44,9 +44,12 @@ public class Transcript
   
   public byte[] generateFromMessages(List<Message> messages) throws IOException
   {
-    File htmlTemplate = findFile("template.html");
+    URL resource = this.getClass().getClassLoader().getResource("template.html");
     
     if (messages.isEmpty()) {throw new IllegalArgumentException("No messages to generate a transcript from");}
+    if (resource == null) {throw new IllegalArgumentException("Template File Can't Be Found.");}
+    
+    File htmlTemplate = new File(resource.getFile());
     
     TextChannel channel = messages.iterator().next().getChannel().asTextChannel();
     Document document = Jsoup.parse(htmlTemplate, "UTF-8");
@@ -502,14 +505,5 @@ public class Transcript
     }
     
     return document.outerHtml().getBytes();
-  }
-  
-  private File findFile(String fileName)
-  {
-    URL url = getClass().getClassLoader().getResource(fileName);
-    
-    if (url == null) {throw new IllegalArgumentException("file is not found: " + fileName);}
-    
-    return new File(url.getFile());
   }
 }

@@ -17,7 +17,6 @@ public class Formatter
   private final static Pattern U = Pattern.compile("__(.+?)__");
   private final static Pattern CODE_BLOCK = Pattern.compile("```(.+?)```");
   private final static Pattern CODE_LINE = Pattern.compile("`(.+?)`");
-  // conver this /(?:\r\n|\r|\n)/g to patter in java
   private final static Pattern NEW_LINE = Pattern.compile("\\n");
   
   public static String formatBytes(long bytes)
@@ -32,60 +31,58 @@ public class Formatter
   
   public static String format(String originalText)
   {
-    System.out.println(originalText);
     Matcher matcher = STRONG.matcher(originalText);
     String newText = originalText;
+    
     while (matcher.find())
     {
       String group = matcher.group();
-      newText = newText.replace(
-              group,
-              "<strong>" + group.replace("**", "") + "</strong>");
+      newText = newText.replace(group, "<strong>%s</strong>".formatted(group.replace("**", "")));
     }
+    
     matcher = EM.matcher(newText);
+    
     while (matcher.find())
     {
       String group = matcher.group();
-      newText = newText.replace(
-              group,
-              "<em>" + group.replace("*", "") + "</em>");
+      newText = newText.replace(group, "<em>%s</em>".formatted(group.replace("*", "")));
     }
+    
     matcher = S.matcher(newText);
+    
     while (matcher.find())
     {
       String group = matcher.group();
-      newText = newText.replace(
-              group,
-              "<s>" + group.replace("~~", "") + "</s>");
+      newText = newText.replace(group, "<s>%s</s>".formatted(group.replace("~~", "")));
     }
+    
     matcher = U.matcher(newText);
+    
     while (matcher.find())
     {
       String group = matcher.group();
-      newText = newText.replace(
-              group,
-              "<u>" + group.replace("__", "") + "</u>");
+      newText = newText.replace(group, "<u>%s</u>".formatted(group.replace("__", "")));
     }
+    
     matcher = CODE_BLOCK.matcher(newText);
+    
     boolean findCode = false;
+    
     while (matcher.find())
     {
       String group = matcher.group();
       newText = newText.replace(
-              group,
-              "<div class=\"pre pre--multiline nohighlight\">"
-                      + group.replace("```", "").substring(3, -3) + "</div>");
+              group, "<div class=\"pre pre--multiline nohighlight\">%s</div>".formatted(group.replace("```", "")));
       findCode = true;
     }
+    
     if (!findCode)
     {
       matcher = CODE_LINE.matcher(newText);
       while (matcher.find())
       {
         String group = matcher.group();
-        newText = newText.replace(
-                group,
-                "<span class=\"pre pre--inline\">" + group.replace("`", "") + "</span>");
+        newText = newText.replace(group, "<span class=\"pre pre--inline\">%s</span>".formatted(group.replace("`", "")));
       }
     }
     matcher = NEW_LINE.matcher(newText);

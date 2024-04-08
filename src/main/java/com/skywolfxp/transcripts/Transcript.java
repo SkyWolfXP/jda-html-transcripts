@@ -14,6 +14,8 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
 
+import static com.skywolfxp.transcripts.Formatter.toHex;
+
 /**
  * Created by SkyWolfXP
  * Project: jda-html-transcripts
@@ -78,7 +80,7 @@ public class Transcript
         Message referenceMessage = message.getReferencedMessage();
         User author = referenceMessage.getAuthor();
         Member member = channel.getGuild().getMember(author);
-        String color = com.skywolfxp.transcripts.Formatter.toHex(Objects.requireNonNull(member.getColor()));
+        String color = toHex(Objects.requireNonNull(member.getColor()));
         
         //        System.out.println("REFERENCE MSG " + referenceMessage.getContentDisplay());
         reference.html("<img class=\"chatlog__reference-avatar\" src=\""
@@ -276,7 +278,7 @@ public class Transcript
             embedColorPill.addClass("chatlog__embed-color-pill");
             embedColorPill.attr(
                     "style",
-                    "background-color: #" + com.skywolfxp.transcripts.Formatter.toHex(embed.getColor()));
+                    "background-color: #" + toHex(embed.getColor()));
             
             embedDiv.appendChild(embedColorPill);
           }

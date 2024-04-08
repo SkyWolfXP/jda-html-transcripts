@@ -42,7 +42,7 @@ public class Transcript
             generateFromMessages(textChannel.getIterableHistory().stream().toList()), fileName != null ? fileName : "transcript.html");
   }
   
-  public static byte[] generateFromMessages(List<Message> messages) throws IOException
+  public byte[] generateFromMessages(List<Message> messages) throws IOException
   {
     File htmlTemplate = findFile("template.html");
     
@@ -504,9 +504,9 @@ public class Transcript
     return document.outerHtml().getBytes();
   }
   
-  private static File findFile(String fileName)
+  private File findFile(String fileName)
   {
-    URL url = Transcript.class.getClassLoader().getResource(fileName);
+    URL url = getClass().getClassLoader().getResource(fileName);
     
     if (url == null) {throw new IllegalArgumentException("file is not found: " + fileName);}
     

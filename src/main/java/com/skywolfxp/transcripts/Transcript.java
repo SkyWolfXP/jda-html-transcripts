@@ -2,19 +2,20 @@ package com.skywolfxp.transcripts;
 
 import net.dv8tion.jda.api.entities.*;
 import net.dv8tion.jda.api.entities.channel.concrete.TextChannel;
+import net.dv8tion.jda.api.interactions.components.buttons.Button;
 import net.dv8tion.jda.api.utils.FileUpload;
+import org.jetbrains.annotations.NotNull;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 
 import java.io.IOException;
-import java.io.InputStream;
+import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.Comparator;
 import java.util.List;
-import java.util.Objects;
 
-import static com.skywolfxp.transcripts.Formatter.toHex;
+import static com.skywolfxp.transcripts.Formatter.*;
 
 /**
  * Created by SkyWolfXP
@@ -25,484 +26,505 @@ public class Transcript
   private static final List<String> VIDEO_FORMATS = List.of("mp4", "webm", "mkv", "avi", "mov", "flv", "wmv", "mpg", "mpeg");
   private static final List<String> IMAGE_FORMATS = List.of("png", "jpg", "jpeg", "gif");
   private static final List<String> AUDIO_FORMATS = List.of("mp3", "wav", "ogg", "flac");
-  private static final Transcript TRANSCRIPT = new Transcript();
+  private static final DateTimeFormatter TIME_FORMATTER = DateTimeFormatter.ofPattern("MM/d/yyyy H:mm a (O)").withZone(ZoneId.systemDefault());
   
-  public static Transcript getTranscript()
-  {
-    return TRANSCRIPT;
-  }
-  
-  public FileUpload createTranscript(TextChannel textChannel) throws IOException
+  public FileUpload createTranscript(@NotNull TextChannel textChannel) throws IOException
   {
     return FileUpload.fromData(generateFromMessages(textChannel.getIterableHistory().stream().toList()), "transcript.html");
   }
   
-  public FileUpload createTranscript(TextChannel textChannel, String fileName) throws IOException
+  public byte[] generateFromMessages(@NotNull List<Message> messages) throws IOException
   {
-    return FileUpload.fromData(
-            generateFromMessages(textChannel.getIterableHistory().stream().toList()), fileName != null ? fileName : "transcript.html");
-  }
-  
-  public byte[] generateFromMessages(List<Message> messages) throws IOException
-  {
-    InputStream resource = getClass().getClassLoader().getResourceAsStream("template.html");
-    
     if (messages.isEmpty()) {throw new IllegalArgumentException("No messages to generate a transcript from");}
-    if (resource == null) {throw new IllegalArgumentException("Template File Can't Be Found.");}
     
     TextChannel channel = messages.iterator().next().getChannel().asTextChannel();
-    Document document = Jsoup.parse(resource, "UTF-8", "");
-    document.outputSettings().indentAmount(0).prettyPrint(true);
-    document.getElementsByClass("preamble__guild-icon")
-            .first().attr("src", channel.getGuild().getIconUrl()); // set guild icon
+    Guild guild = channel.getGuild();
+    Document doc = Jsoup.parse(getClass().getClassLoader().getResourceAsStream("transcript.html"), "UTF-8", "");
+    doc.outputSettings().indentAmount(0).prettyPrint(true);
     
-    document.getElementById("transcriptTitle").text(channel.getName()); // set title
-    document.getElementById("guildname").text(channel.getGuild().getName()); // set guild name
-    document.getElementById("ticketname").text(channel.getName()); // set channel name
-    
-    Element chatLog = document.getElementById("chatlog"); // chat log
-    for (Message message : messages.stream().sorted(Comparator.comparing(ISnowflake::getTimeCreated)).toList())
+    if (guild.getIconUrl() != null)
     {
-      // create message group
-      Element messageGroup = document.createElement("div");
-      messageGroup.addClass("chatlog__message-group");
+      doc.getElementsByClass("preamble__guild-icon").attr("src", guild.getIconUrl());
+    }
+    
+    doc.getElementById("ticketTitle").text("#%s | %s".formatted(channel.getName(), guild.getName()));
+    doc.getElementById("guildName").text(guild.getName());
+    doc.getElementById("ticketName").text("#%s".formatted(channel.getName()));
+    
+    Element elChatLog = doc.getElementById("chatlog");
+    
+    for (Message msg : messages.stream().sorted(Comparator.comparing(ISnowflake::getTimeCreated)).toList())
+    {
+      // Message Group
+      Element elMessageGroup = doc.createElement("div").addClass("chatlog__message-group");
       
-      // message reference
-      if (message.getReferencedMessage() != null)
+      // Referenced Message
+      if (msg.getReferencedMessage() != null)
       {
-        Element referenceSymbol = document.createElement("div");
-        referenceSymbol.addClass("chatlog__reference-symbol");
+        Element elReference = doc.createElement("div").addClass("chatlog__reference");
+        Element elReferenceSymbol = doc.createElement("div").addClass("chatlog__reference-symbol");
         
-        // create reference
-        Element reference = document.createElement("div");
-        reference.addClass("chatlog__reference");
+        Message referencedMessage = msg.getReferencedMessage();
+        User author = referencedMessage.getAuthor();
         
-        Message referenceMessage = message.getReferencedMessage();
-        User author = referenceMessage.getAuthor();
-        Member member = channel.getGuild().getMember(author);
-        String color = toHex(Objects.requireNonNull(member.getColor()));
+        guild.retrieveMemberById(author.getIdLong()).queue(
+                (member) -> elReference.html("""
+                                             <img class="chatlog__reference-avatar" src="%s" alt="Avatar" loading="lazy">
+                                             <span class="chatlog__reference-name" title="%s" style="color: %s">%s</span>
+                                             <div class="chatlog__reference-content">
+                                             <span class="chatlog__reference-link" onclick="scrollToMessage(event, '%s')">
+                                             <em style="font-style: italic;">
+                                             %s
+                                             </em>
+                                             </span>
+                                             </div>
+                                             """.formatted(author.getAvatarUrl(), author.getName(),
+                                                           member.getColor(), author.getName(),
+                                                           referencedMessage.getId(),
+                                                           referencedMessage.getContentDisplay().length() > 42
+                                                           ? referencedMessage.getContentDisplay().substring(0, 42) + "..."
+                                                           : " Click to see attachment %s".formatted(
+                                                                   doc.createElement("img").attr("src", "https://svgshare.com/i/15DK.svg")))),
+                (err) ->
+                {
+                  throw new IllegalArgumentException("Can't Generate Transcript");
+                });
         
-        //        System.out.println("REFERENCE MSG " + referenceMessage.getContentDisplay());
-        reference.html("<img class=\"chatlog__reference-avatar\" src=\""
-                               + author.getAvatarUrl() + "\" alt=\"Avatar\" loading=\"lazy\">" +
-                               "<span class=\"chatlog__reference-name\" title=\"" + author.getName()
-                               + "\" style=\"color: " + color + "\">" + author.getName() + "\"</span>" +
-                               "<div class=\"chatlog__reference-content\">" +
-                               " <span class=\"chatlog__reference-link\" onclick=\"scrollToMessage(event, '"
-                               + referenceMessage.getId() + "')\">" +
-                               "<em>" +
-                               referenceMessage.getContentDisplay() != null
-                       ? referenceMessage.getContentDisplay().length() > 42
-                         ? referenceMessage.getContentDisplay().substring(0, 42)
-                                 + "..."
-                         : referenceMessage.getContentDisplay()
-                       : "Click to see attachment" +
-                               "</em>" +
-                               "</span>" +
-                               "</div>");
-        
-        messageGroup.appendChild(referenceSymbol);
-        messageGroup.appendChild(reference);
+        elMessageGroup.appendChild(elReferenceSymbol);
+        elMessageGroup.appendChild(elReference);
       }
       
-      User author = message.getAuthor();
+      // Messages
+      Element elMessages = doc.createElement("div").addClass("chatlog__messages");
       
-      Element authorElement = document.createElement("div");
-      authorElement.addClass("chatlog__author-avatar-container");
+      // Timestamp
+      Element elTimestamp = doc.createElement("span")
+                               .addClass("chatlog__timestamp")
+                               .text("%s".formatted(msg.getTimeCreated().format(TIME_FORMATTER)));
       
-      Element authorAvatar = document.createElement("img");
-      authorAvatar.addClass("chatlog__author-avatar");
-      authorAvatar.attr("src", author.getAvatarUrl());
-      authorAvatar.attr("alt", "Avatar");
-      authorAvatar.attr("loading", "lazy");
+      Element elMessage = doc.createElement("div")
+                             .addClass("chatlog__message")
+                             .attr("data-message-id", msg.getId())
+                             .attr("id", "message-%s".formatted(msg.getId()))
+                             .attr("title", "Message sent: %s".formatted(msg.getTimeCreated().format(TIME_FORMATTER)));
       
-      authorElement.appendChild(authorAvatar);
-      messageGroup.appendChild(authorElement);
-      
-      // message content
-      Element content = document.createElement("div");
-      content.addClass("chatlog__messages");
-      // message author name
-      Element authorName = document.createElement("span");
-      authorName.addClass("chatlog__author-name");
-      // authorName.attr("title", author.getName()); // author.name
-      authorName.attr("title", author.getName());
-      authorName.text(author.getName());
-      authorName.attr("data-user-id", author.getId());
-      content.appendChild(authorName);
-      
-      if (author.isBot())
+      // System Message
+      if (msg.getType().equals(MessageType.CHANNEL_PINNED_ADD))
       {
-        Element botTag = document.createElement("span");
-        botTag.addClass("chatlog__bot-tag").text("BOT");
-        content.appendChild(botTag);
+        Element elSystemMessage = doc.createElement("div")
+                                     .addClass("chatlog__system-message");
+        
+        Element elSystemMessagePinned = doc.createElement("div")
+                                           .addClass("chatlog__system-message__pinned")
+                                           .addClass("chatlog__reference-avatar");
+        
+        elSystemMessage.appendChild(elSystemMessagePinned);
+        elMessageGroup.appendChild(elSystemMessage);
+        
+        Element elMessageContentDisplay = doc.createElement("div").addClass("chatlog__content");
+        
+        Element elMessageContentDisplayMarkdown = doc.createElement("div").addClass("markdown");
+        
+        Element elMessageContentDisplayMarkdownSpan = doc.createElement("span")
+                                                         .addClass("preserve-whitespace")
+                                                         .html("""
+                                                               <b style="color:white;">%s</b> pinned a message to this channel. %s
+                                                               """.formatted(msg.getAuthor().getName(), elTimestamp));
+        
+        elMessageContentDisplayMarkdown.appendChild(elMessageContentDisplayMarkdownSpan);
+        elMessageContentDisplay.appendChild(elMessageContentDisplayMarkdown);
+        elMessage.appendChild(elMessageContentDisplay);
       }
-      
-      // timestamp
-      Element timestamp = document.createElement("span");
-      timestamp.addClass("chatlog__timestamp");
-      timestamp
-              .text(message.getTimeCreated().format(DateTimeFormatter.ofPattern("HH:mm:ss")));
-      
-      content.appendChild(timestamp);
-      
-      Element messageContent = document.createElement("div");
-      messageContent.addClass("chatlog__message");
-      messageContent.attr("data-message-id", message.getId());
-      messageContent.attr("id", "message-" + message.getId());
-      messageContent.attr("title", "Message sent: "
-              + message.getTimeCreated().format(DateTimeFormatter.ofPattern("HH:mm:ss")));
-      
-      if (!message.getContentDisplay().isEmpty())
+      else
       {
-        Element messageContentContent = document.createElement("div");
-        messageContentContent.addClass("chatlog__content");
+        User user = msg.getAuthor();
         
-        Element messageContentContentMarkdown = document.createElement("div");
-        messageContentContentMarkdown.addClass("markdown");
+        Element elAuthorContainer = doc.createElement("div")
+                                       .addClass("chatlog__author-avatar-container");
         
-        Element messageContentContentMarkdownSpan = document.createElement("span");
-        messageContentContentMarkdownSpan.addClass("preserve-whitespace");
-        messageContentContentMarkdownSpan.html(com.skywolfxp.transcripts.Formatter.format(message.getContentDisplay()));
+        Element elAuthorAvatar = doc.createElement("img")
+                                    .addClass("chatlog__author-avatar")
+                                    .attr("src", user.getEffectiveAvatarUrl())
+                                    .attr("alt", "Avatar")
+                                    .attr("loading", "lazy");
         
-        messageContentContentMarkdown.appendChild(messageContentContentMarkdownSpan);
-        messageContentContent.appendChild(messageContentContentMarkdown);
-        messageContent.appendChild(messageContentContent);
-      }
-      
-      // messsage attachments
-      if (!message.getAttachments().isEmpty())
-      {
-        for (Message.Attachment attach : message.getAttachments())
+        Element elAuthorName = doc.createElement("span")
+                                  .addClass("chatlog__author-name")
+                                  .attr("title", user.getName())
+                                  .attr("data-user-id", user.getId())
+                                  .text(user.getName());
+        
+        elAuthorContainer.appendChild(elAuthorAvatar);
+        elMessageGroup.appendChild(elAuthorContainer);
+        elMessages.appendChild(elAuthorName);
+        
+        if (user.isBot())
         {
-          Element attachmentsDiv = document.createElement("div");
-          attachmentsDiv.addClass("chatlog__attachment");
+          Element elBotTag = doc.createElement("span")
+                                .addClass("chatlog__bot-tag")
+                                .text("BOT");
           
-          String attachmentType = attach.getFileExtension();
-          if (IMAGE_FORMATS.contains(attachmentType))
+          elMessages.appendChild(elBotTag);
+        }
+        
+        elMessages.appendChild(elTimestamp);
+      }
+      
+      // Message Content
+      if (!msg.getContentDisplay().isEmpty())
+      {
+        Element elMessageContentDisplay = doc.createElement("div").addClass("chatlog__content");
+        
+        Element elMessageContentDisplayMarkdown = doc.createElement("div").addClass("markdown");
+        
+        Element elMessageContentDisplayMarkdownSpan = doc.createElement("span")
+                                                         .addClass("preserve-whitespace")
+                                                         .html(format(msg.getContentDisplay()));
+        
+        elMessageContentDisplayMarkdown.appendChild(elMessageContentDisplayMarkdownSpan);
+        elMessageContentDisplay.appendChild(elMessageContentDisplayMarkdown);
+        elMessage.appendChild(elMessageContentDisplay);
+      }
+      
+      // Attachments
+      if (!msg.getAttachments().isEmpty())
+      {
+        for (Message.Attachment attachment : msg.getAttachments())
+        {
+          Element elAttachment = doc.createElement("div").addClass("chatlog__attachment");
+          
+          if (IMAGE_FORMATS.contains(attachment.getFileExtension()))
           {
-            Element attachmentLink = document.createElement("a");
+            Element elAttachmentLink = doc.createElement("a");
+            Element elAttachmentImage = doc.createElement("img")
+                                           .addClass("chatlog__attachment-media")
+                                           .attr("src", attachment.getUrl())
+                                           .attr("alt", "Image attachment")
+                                           .attr("loading", "lazy")
+                                           .attr("title", "Image: %s%s".formatted(
+                                                   attachment.getFileName(), formatBytes(attachment.getSize())));
             
-            Element attachmentImage = document.createElement("img");
-            attachmentImage.addClass("chatlog__attachment-media");
-            attachmentImage.attr("src", attach.getUrl());
-            attachmentImage.attr("alt", "Image attachment");
-            attachmentImage.attr("loading", "lazy");
-            attachmentImage.attr(
-                    "title",
-                    "Image: " + attach.getFileName() + com.skywolfxp.transcripts.Formatter.formatBytes(attach.getSize()));
-            
-            attachmentLink.appendChild(attachmentImage);
-            attachmentsDiv.appendChild(attachmentLink);
+            elAttachmentLink.appendChild(elAttachmentImage);
+            elAttachment.appendChild(elAttachmentLink);
           }
-          else if (VIDEO_FORMATS.contains(attachmentType))
+          else if (VIDEO_FORMATS.contains(attachment.getFileExtension()))
           {
-            Element attachmentVideo = document.createElement("video");
-            attachmentVideo.addClass("chatlog__attachment-media");
-            attachmentVideo.attr("src", attach.getUrl());
-            attachmentVideo.attr("alt", "Video attachment");
-            attachmentVideo.attr("controls", true);
-            attachmentVideo.attr(
-                    "title",
-                    "Video: " + attach.getFileName() + com.skywolfxp.transcripts.Formatter.formatBytes(attach.getSize()));
+            Element elAttachmentVideo = doc.createElement("video")
+                                           .addClass("chatlog__attachment-media")
+                                           .attr("src", attachment.getUrl())
+                                           .attr("alt", "Video attachment")
+                                           .attr("controls", true)
+                                           .attr("title", "Video: %s%s".formatted(
+                                                   attachment.getFileName(), formatBytes(attachment.getSize())));
             
-            attachmentsDiv.appendChild(attachmentVideo);
+            elAttachment.appendChild(elAttachmentVideo);
           }
-          else if (AUDIO_FORMATS.contains(attachmentType))
+          else if (AUDIO_FORMATS.contains(attachment.getFileExtension()))
           {
-            Element attachmentAudio = document.createElement("audio");
-            attachmentAudio.addClass("chatlog__attachment-media");
-            attachmentAudio.attr("src", attach.getUrl());
-            attachmentAudio.attr("alt", "Audio attachment");
-            attachmentAudio.attr("controls", true);
-            attachmentAudio.attr(
-                    "title",
-                    "Audio: " + attach.getFileName() + com.skywolfxp.transcripts.Formatter.formatBytes(attach.getSize()));
+            Element elAttachmentAudio = doc.createElement("audio")
+                                           .addClass("chatlog__attachment-media")
+                                           .attr("src", attachment.getUrl())
+                                           .attr("alt", "Audio attachment")
+                                           .attr("controls", true)
+                                           .attr("title", "Audio: %s%s".formatted(
+                                                   attachment.getFileName(), formatBytes(attachment.getSize())));
             
-            attachmentsDiv.appendChild(attachmentAudio);
+            elAttachment.appendChild(elAttachmentAudio);
           }
           else
           {
-            Element attachmentGeneric = document.createElement("div");
-            attachmentGeneric.addClass("chatlog__attachment-generic");
+            Element elAttachmentGeneric = doc.createElement("div").addClass("chatlog__attachment-generic");
             
-            Element attachmentGenericIcon = document.createElement("svg");
-            attachmentGenericIcon.addClass("chatlog__attachment-generic-icon");
+            Element elAttachmentGenericIcon = doc.createElement("svg").addClass("chatlog__attachment-generic-icon");
+            Element elAttachmentGenericIconUse = doc.createElement("use").attr("xlink:href", "#icon-attachment");
             
-            Element attachmentGenericIconUse = document.createElement("use");
-            attachmentGenericIconUse.attr("xlink:href", "#icon-attachment");
+            elAttachmentGeneric.appendChild(elAttachmentGenericIcon);
+            elAttachmentGenericIcon.appendChild(elAttachmentGenericIconUse);
             
-            attachmentGenericIcon.appendChild(attachmentGenericIconUse);
-            attachmentGeneric.appendChild(attachmentGenericIcon);
+            Element elAttachmentGenericName = doc.createElement("div").addClass("chatlog__attachment-generic-name");
+            Element elAttachmentGenericNameLink = doc.createElement("a")
+                                                     .attr("href", attachment.getUrl())
+                                                     .text(attachment.getFileName());
             
-            Element attachmentGenericName = document.createElement("div");
-            attachmentGenericName.addClass("chatlog__attachment-generic-name");
+            elAttachmentGenericName.appendChild(elAttachmentGenericNameLink);
+            elAttachmentGeneric.appendChild(elAttachmentGenericName);
             
-            Element attachmentGenericNameLink = document.createElement("a");
-            attachmentGenericNameLink.attr("href", attach.getUrl());
-            attachmentGenericNameLink.text(attach.getFileName());
+            Element elAttachmentGenericSize = doc.createElement("div")
+                                                 .addClass("chatlog__attachment-generic-size")
+                                                 .text(formatBytes(attachment.getSize()));
             
-            attachmentGenericName.appendChild(attachmentGenericNameLink);
-            attachmentGeneric.appendChild(attachmentGenericName);
-            
-            Element attachmentGenericSize = document.createElement("div");
-            attachmentGenericSize.addClass("chatlog__attachment-generic-size");
-            
-            attachmentGenericSize.text(com.skywolfxp.transcripts.Formatter.formatBytes(attach.getSize()));
-            attachmentGeneric.appendChild(attachmentGenericSize);
-            
-            attachmentsDiv.appendChild(attachmentGeneric);
+            elAttachmentGeneric.appendChild(elAttachmentGenericSize);
+            elAttachment.appendChild(elAttachmentGeneric);
           }
           
-          messageContent.appendChild(attachmentsDiv);
+          elMessage.appendChild(elAttachment);
         }
       }
       
-      content.appendChild(messageContent);
+      elMessages.appendChild(elMessage);
       
-      if (!message.getEmbeds().isEmpty())
+      // Embeds
+      if (!msg.getEmbeds().isEmpty())
       {
-        for (MessageEmbed embed : message.getEmbeds())
+        for (MessageEmbed embed : msg.getEmbeds())
         {
-          if (embed == null)
-          {
-            continue;
-          }
-          Element embedDiv = document.createElement("div");
-          embedDiv.addClass("chatlog__embed");
+          Element elEmbed = doc.createElement("div").addClass("chatlog__embed");
           
-          // embed color
+          // Embed Color
+          Element elEmbedColor = doc.createElement("div").addClass("chatlog__embed-color-pill");
+          
           if (embed.getColor() != null)
           {
-            Element embedColorPill = document.createElement("div");
-            embedColorPill.addClass("chatlog__embed-color-pill");
-            embedColorPill.attr(
-                    "style",
-                    "background-color: #" + toHex(embed.getColor()));
-            
-            embedDiv.appendChild(embedColorPill);
+            elEmbedColor.attr("style", "background-color: #%s".formatted(toHex(embed.getColor())));
           }
           
-          Element embedContentContainer = document.createElement("div");
-          embedContentContainer.addClass("chatlog__embed-content-container");
+          elEmbed.appendChild(elEmbedColor);
           
-          Element embedContent = document.createElement("div");
-          embedContent.addClass("chatlog__embed-content");
+          Element elEmbedContentContainer = doc.createElement("div").addClass("chatlog__embed-content-container");
+          Element elEmbedContent = doc.createElement("div").addClass("chatlog__embed-content");
+          Element elEmbedText = doc.createElement("div").addClass("chatlog__embed-text");
           
-          Element embedText = document.createElement("div");
-          embedText.addClass("chatlog__embed-text");
-          
-          // embed author
-          if (embed.getAuthor() != null && embed.getAuthor().getName() != null)
+          // Embed Author
+          if ((embed.getAuthor() != null) && (embed.getAuthor().getName() != null))
           {
-            Element embedAuthor = document.createElement("div");
-            embedAuthor.addClass("chatlog__embed-author");
+            Element elEmbedAuthor = doc.createElement("div").addClass("chatlog__embed-author");
             
             if (embed.getAuthor().getIconUrl() != null)
             {
-              Element embedAuthorIcon = document.createElement("img");
-              embedAuthorIcon.addClass("chatlog__embed-author-icon");
-              embedAuthorIcon.attr("src", embed.getAuthor().getIconUrl());
-              embedAuthorIcon.attr("alt", "Author icon");
-              embedAuthorIcon.attr("loading", "lazy");
+              Element elEmbedAuthorIcon = doc.createElement("img")
+                                             .addClass("chatlog__embed-author-icon")
+                                             .attr("src", embed.getAuthor().getIconUrl())
+                                             .attr("alt", "Author icon")
+                                             .attr("loading", "lazy");
               
-              embedAuthor.appendChild(embedAuthorIcon);
+              elEmbedAuthor.appendChild(elEmbedAuthorIcon);
             }
             
-            Element embedAuthorName = document.createElement("span");
-            embedAuthorName.addClass("chatlog__embed-author-name");
+            Element elEmbedAuthorName = doc.createElement("span").addClass("chatlog__embed-author-name");
             
             if (embed.getAuthor().getUrl() != null)
             {
-              Element embedAuthorNameLink = document.createElement("a");
-              embedAuthorNameLink.addClass("chatlog__embed-author-name-link");
-              embedAuthorNameLink.attr("href", embed.getAuthor().getUrl());
-              embedAuthorNameLink.text(embed.getAuthor().getName());
+              Element elEmbedAuthorNameLink = doc.createElement("a")
+                                                 .addClass("chatlog__embed-author-name-link")
+                                                 .attr("href", embed.getAuthor().getUrl())
+                                                 .text(embed.getAuthor().getName());
               
-              embedAuthorName.appendChild(embedAuthorNameLink);
+              elEmbedAuthorName.appendChild(elEmbedAuthorNameLink);
             }
             else
             {
-              embedAuthorName.text(embed.getAuthor().getName());
+              elEmbedAuthorName.text(embed.getAuthor().getName());
             }
             
-            embedAuthor.appendChild(embedAuthorName);
-            embedText.appendChild(embedAuthor);
+            elEmbedAuthor.appendChild(elEmbedAuthorName);
+            elEmbedText.appendChild(elEmbedAuthor);
           }
           
-          // embed title
+          // Embed Title
           if (embed.getTitle() != null)
           {
-            Element embedTitle = document.createElement("div");
-            embedTitle.addClass("chatlog__embed-title");
+            Element elEmbedTitle = doc.createElement("div").addClass("chatlog__embed-title");
             
             if (embed.getUrl() != null)
             {
-              Element embedTitleLink = document.createElement("a");
-              embedTitleLink.addClass("chatlog__embed-title-link");
-              embedTitleLink.attr("href", embed.getUrl());
+              Element elEmbedTitleLink = doc.createElement("a")
+                                            .addClass("chatlog__embed-title-link")
+                                            .attr("href", embed.getUrl());
               
-              Element embedTitleMarkdown = document.createElement("div");
-              embedTitleMarkdown.addClass("markdown preserve-whitespace")
-                                .html(com.skywolfxp.transcripts.Formatter.format(embed.getTitle()));
+              Element elEmbedTitleMarkdown = doc.createElement("div")
+                                                .addClass("markdown")
+                                                .html(format(embed.getTitle()));
               
-              embedTitleLink.appendChild(embedTitleMarkdown);
-              embedTitle.appendChild(embedTitleLink);
+              elEmbedTitleLink.appendChild(elEmbedTitleMarkdown);
+              elEmbedTitle.appendChild(elEmbedTitleLink);
             }
             else
             {
-              Element embedTitleMarkdown = document.createElement("div");
-              embedTitleMarkdown.addClass("markdown preserve-whitespace")
-                                .html(com.skywolfxp.transcripts.Formatter.format(embed.getTitle()));
+              Element elEmbedTitleMarkdown = doc.createElement("div")
+                                                .addClass("markdown")
+                                                .html(format(embed.getTitle()));
               
-              embedTitle.appendChild(embedTitleMarkdown);
+              elEmbedTitle.appendChild(elEmbedTitleMarkdown);
             }
-            embedText.appendChild(embedTitle);
+            
+            elEmbedText.appendChild(elEmbedTitle);
           }
           
-          // embed description
+          // Embed Description
           if (embed.getDescription() != null)
           {
-            Element embedDescription = document.createElement("div");
-            embedDescription.addClass("chatlog__embed-description");
+            Element elEmbedDescription = doc.createElement("div")
+                                            .addClass("chatlog__embed-description");
             
-            Element embedDescriptionMarkdown = document.createElement("div");
-            embedDescriptionMarkdown.addClass("markdown preserve-whitespace");
-            embedDescriptionMarkdown
-                    .html(com.skywolfxp.transcripts.Formatter.format(embed.getDescription()));
+            Element elEmbedDescriptionMarkdown = doc.createElement("div")
+                                                    .addClass("markdown")
+                                                    .html(format(embed.getDescription()));
             
-            embedDescription.appendChild(embedDescriptionMarkdown);
-            embedText.appendChild(embedDescription);
+            elEmbedDescription.appendChild(elEmbedDescriptionMarkdown);
+            elEmbedText.appendChild(elEmbedDescription);
           }
           
-          // embed fields
+          // Embed Field
           if (!embed.getFields().isEmpty())
           {
-            Element embedFields = document.createElement("div");
-            embedFields.addClass("chatlog__embed-fields");
+            Element elEmbedFields = doc.createElement("div").addClass("chatlog__embed-fields");
             
             for (MessageEmbed.Field field : embed.getFields())
             {
-              Element embedField = document.createElement("div");
-              embedField.addClass(field.isInline() ? "chatlog__embed-field-inline"
-                                                   : "chatlog__embed-field");
+              Element elEmbedField = doc.createElement("div");
+              elEmbedField.addClass(field.isInline() ? "chatlog__embed-field-inline" : "chatlog__embed-field");
               
-              // Field nmae
-              Element embedFieldName = document.createElement("div");
-              embedFieldName.addClass("chatlog__embed-field-name");
+              // Field Name
+              if (field.getName() != null)
+              {
+                Element elEmbedFieldName = doc.createElement("div").addClass("chatlog__embed-field-name");
+                
+                Element elEmbedFieldNameMarkdown = doc.createElement("div")
+                                                      .addClass("markdown")
+                                                      .html(field.getName());
+                
+                elEmbedFieldName.appendChild(elEmbedFieldNameMarkdown);
+                elEmbedField.appendChild(elEmbedFieldName);
+              }
               
-              Element embedFieldNameMarkdown = document.createElement("div");
-              embedFieldNameMarkdown.addClass("markdown preserve-whitespace");
-              embedFieldNameMarkdown.html(field.getName());
-              
-              embedFieldName.appendChild(embedFieldNameMarkdown);
-              embedField.appendChild(embedFieldName);
-              
-              
-              // Field value
-              Element embedFieldValue = document.createElement("div");
-              embedFieldValue.addClass("chatlog__embed-field-value");
-              
-              Element embedFieldValueMarkdown = document.createElement("div");
-              embedFieldValueMarkdown.addClass("markdown preserve-whitespace");
-              embedFieldValueMarkdown
-                      .html(Formatter.format(field.getValue()));
-              
-              embedFieldValue.appendChild(embedFieldValueMarkdown);
-              embedField.appendChild(embedFieldValue);
-              
-              embedFields.appendChild(embedField);
+              // Field Value
+              if (field.getValue() != null)
+              {
+                Element elEmbedFieldValue = doc.createElement("div").addClass("chatlog__embed-field-value");
+                
+                Element elEmbedFieldValueMarkdown = doc.createElement("div")
+                                                       .addClass("markdown")
+                                                       .html(format(field.getValue()));
+                
+                elEmbedFieldValue.appendChild(elEmbedFieldValueMarkdown);
+                elEmbedField.appendChild(elEmbedFieldValue);
+                
+                elEmbedFields.appendChild(elEmbedField);
+              }
             }
             
-            embedText.appendChild(embedFields);
+            elEmbedText.appendChild(elEmbedFields);
           }
           
-          embedContent.appendChild(embedText);
+          elEmbedContent.appendChild(elEmbedText);
           
-          // embed thumbnail
-          if (embed.getThumbnail() != null)
+          // Embed Thumbnail
+          if ((embed.getThumbnail() != null) && (embed.getThumbnail().getUrl() != null))
           {
-            Element embedThumbnail = document.createElement("div");
-            embedThumbnail.addClass("chatlog__embed-thumbnail-container");
+            Element elEmbedThumbnail = doc.createElement("div").addClass("chatlog__embed-thumbnail-container");
             
-            Element embedThumbnailLink = document.createElement("a");
-            embedThumbnailLink.addClass("chatlog__embed-thumbnail-link");
-            embedThumbnailLink.attr("href", embed.getThumbnail().getUrl());
+            Element elEmbedThumbnailLink = doc.createElement("a")
+                                              .addClass("chatlog__embed-thumbnail-link")
+                                              .attr("href", embed.getThumbnail().getUrl());
             
-            Element embedThumbnailImage = document.createElement("img");
-            embedThumbnailImage.addClass("chatlog__embed-thumbnail");
-            embedThumbnailImage.attr("src", embed.getThumbnail().getUrl());
-            embedThumbnailImage.attr("alt", "Thumbnail");
-            embedThumbnailImage.attr("loading", "lazy");
+            Element elEmbedThumbnailImage = doc.createElement("img")
+                                               .addClass("chatlog__embed-thumbnail")
+                                               .attr("src", embed.getThumbnail().getUrl())
+                                               .attr("alt", "Thumbnail")
+                                               .attr("loading", "lazy");
             
-            embedThumbnailLink.appendChild(embedThumbnailImage);
-            embedThumbnail.appendChild(embedThumbnailLink);
+            elEmbedThumbnailLink.appendChild(elEmbedThumbnailImage);
+            elEmbedThumbnail.appendChild(elEmbedThumbnailLink);
             
-            embedContent.appendChild(embedThumbnail);
+            elEmbedContent.appendChild(elEmbedThumbnail);
           }
           
-          embedContentContainer.appendChild(embedContent);
+          elEmbedContentContainer.appendChild(elEmbedContent);
           
-          // embed image
-          if (embed.getImage() != null)
+          // Embed Image
+          if ((embed.getImage() != null) && (embed.getImage().getUrl() != null))
           {
-            Element embedImage = document.createElement("div");
-            embedImage.addClass("chatlog__embed-image-container");
+            Element elEmbedImage = doc.createElement("div").addClass("chatlog__embed-image-container");
             
-            Element embedImageLink = document.createElement("a");
-            embedImageLink.addClass("chatlog__embed-image-link");
-            embedImageLink.attr("href", embed.getImage().getUrl());
+            Element elEmbedImageLink = doc.createElement("a")
+                                          .addClass("chatlog__embed-image-link")
+                                          .attr("href", embed.getImage().getUrl());
             
-            Element embedImageImage = document.createElement("img");
-            embedImageImage.addClass("chatlog__embed-image");
-            embedImageImage.attr("src", embed.getImage().getUrl());
-            embedImageImage.attr("alt", "Image");
-            embedImageImage.attr("loading", "lazy");
+            Element elEmbedImageImage = doc.createElement("img")
+                                           .addClass("chatlog__embed-image")
+                                           .attr("src", embed.getImage().getUrl())
+                                           .attr("alt", "Image")
+                                           .attr("loading", "lazy");
             
-            embedImageLink.appendChild(embedImageImage);
-            embedImage.appendChild(embedImageLink);
+            elEmbedImageLink.appendChild(elEmbedImageImage);
+            elEmbedImage.appendChild(elEmbedImageLink);
             
-            embedContentContainer.appendChild(embedImage);
+            elEmbedContentContainer.appendChild(elEmbedImage);
           }
           
-          // embed footer
+          // Embed Footer
           if (embed.getFooter() != null)
           {
-            Element embedFooter = document.createElement("div");
-            embedFooter.addClass("chatlog__embed-footer");
+            Element elEmbedFooter = doc.createElement("div").addClass("chatlog__embed-footer");
             
             if (embed.getFooter().getIconUrl() != null)
             {
-              Element embedFooterIcon = document.createElement("img");
-              embedFooterIcon.addClass("chatlog__embed-footer-icon");
-              embedFooterIcon.attr("src", embed.getFooter().getIconUrl());
-              embedFooterIcon.attr("alt", "Footer icon");
-              embedFooterIcon.attr("loading", "lazy");
+              Element elEmbedFooterIcon = doc.createElement("img")
+                                             .addClass("chatlog__embed-footer-icon")
+                                             .attr("src", embed.getFooter().getIconUrl())
+                                             .attr("alt", "Footer icon")
+                                             .attr("loading", "lazy");
               
-              embedFooter.appendChild(embedFooterIcon);
+              elEmbedFooter.appendChild(elEmbedFooterIcon);
             }
             
-            Element embedFooterText = document.createElement("span");
-            embedFooterText.addClass("chatlog__embed-footer-text");
-            embedFooterText.text(embed.getTimestamp() != null
-                                 ? embed.getFooter().getText() + " • " + embed.getTimestamp()
-                                                                              .format(DateTimeFormatter.ofPattern("HH:mm:ss"))
-                                 : embed.getFooter().getText());
+            if (embed.getFooter().getText() != null)
+            {
+              Element elEmbedFooterText = doc.createElement("span")
+                                             .addClass("chatlog__embed-footer-text")
+                                             .text(embed.getTimestamp() != null
+                                                   ? "%s • %s".formatted(
+                                                     embed.getFooter().getText(),
+                                                     embed.getTimestamp().format(TIME_FORMATTER))
+                                                   : embed.getFooter().getText());
+              
+              elEmbedFooter.appendChild(elEmbedFooterText);
+            }
             
-            embedFooter.appendChild(embedFooterText);
-            
-            embedContentContainer.appendChild(embedFooter);
+            elEmbedContentContainer.appendChild(elEmbedFooter);
           }
           
-          embedDiv.appendChild(embedContentContainer);
-          content.appendChild(embedDiv);
+          elEmbed.appendChild(elEmbedContentContainer);
+          elMessages.appendChild(elEmbed);
         }
       }
       
-      messageGroup.appendChild(content);
-      chatLog.appendChild(messageGroup);
+      Element elActionRow = doc.createElement("div").addClass("chatlog__action-row");
+      
+      // Buttons
+      if (!msg.getButtons().isEmpty())
+      {
+        for (Button button : msg.getButtons())
+        {
+          Element elButton = doc.createElement("div").addClass("chatlog__action-row__button");
+          
+          switch (button.getStyle())
+          {
+          case PRIMARY -> elButton.addClass("chatlog__action-row__button--primary");
+          case SECONDARY -> elButton.addClass("chatlog__action-row__button--secondary");
+          case SUCCESS -> elButton.addClass("chatlog__action-row__button--success");
+          case DANGER -> elButton.addClass("chatlog__action-row__button--danger");
+          case LINK -> elButton.addClass("chatlog__action-row__button--link");
+          }
+          
+          Element elButtonLabel = doc.createElement("span")
+                                     .text(button.getLabel());
+          
+          Element elButtonEmoji = doc.createElement("span")
+                                     .addClass("chatlog__action-row__button__emoji")
+                                     .text(button.getEmoji() == null ? "" : button.getEmoji().getName());
+          
+          elButton.appendChild(elButtonEmoji)
+                  .appendChild(elButtonLabel);
+          elActionRow.appendChild(elButton);
+          elMessages.appendChild(elActionRow);
+        }
+      }
+      
+      elMessageGroup.appendChild(elMessages);
+      elChatLog.appendChild(elMessageGroup);
     }
     
-    return document.outerHtml().getBytes();
+    return doc.outerHtml().getBytes();
   }
 }

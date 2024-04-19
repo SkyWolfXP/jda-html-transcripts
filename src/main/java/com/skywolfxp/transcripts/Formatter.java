@@ -10,96 +10,91 @@ import java.util.regex.Pattern;
  */
 public class Formatter
 {
-  
-  private final static Pattern STRONG = Pattern.compile("\\*\\*(.+?)\\*\\*");
-  private final static Pattern EM = Pattern.compile("\\*(.+?)\\*");
-  private final static Pattern S = Pattern.compile("~~(.+?)~~");
-  private final static Pattern U = Pattern.compile("__(.+?)__");
+  private final static Pattern BOLD = Pattern.compile("\\*\\*(.+?)\\*\\*");
+  private final static Pattern ITALIC = Pattern.compile("\\*(.+?)\\*");
+  private final static Pattern STRIKE_THROUGH = Pattern.compile("~~(.+?)~~");
+  private final static Pattern UNDERLINE = Pattern.compile("__(.+?)__");
   private final static Pattern CODE_BLOCK = Pattern.compile("```(.+?)```");
   private final static Pattern CODE_LINE = Pattern.compile("`(.+?)`");
-  private final static Pattern NEW_LINE = Pattern.compile("\\n");
+  private final static Pattern LINE_BREAK = Pattern.compile("\\n");
   
   public static String formatBytes(long bytes)
   {
     int unit = 1024;
-    if (bytes < unit)
-    {return bytes + " B";}
+    
+    if (bytes < unit) {return bytes + " B";}
+    
     int exp = (int) (Math.log(bytes) / Math.log(unit));
     String pre = "KMGTPE".charAt(exp - 1) + "";
+    
     return String.format("%.1f %sB", bytes / Math.pow(unit, exp), pre);
   }
   
-  public static String format(String originalText)
+  public static String format(String text)
   {
-    Matcher matcher = STRONG.matcher(originalText);
-    String newText = originalText;
+    boolean foundCodeBlock = false;
     
+    Matcher matcher = BOLD.matcher(text);
     while (matcher.find())
     {
       String group = matcher.group();
-      newText = newText.replace(group, "<strong>%s</strong>".formatted(group.replace("**", "")));
+      text = text.replace(group, "<strong>%s</strong>".formatted(group.replace("**", "")));
     }
     
-    matcher = EM.matcher(newText);
-    
+    matcher = ITALIC.matcher(text);
     while (matcher.find())
     {
       String group = matcher.group();
-      newText = newText.replace(group, "<em>%s</em>".formatted(group.replace("*", "")));
+      text = text.replace(group, "<em>%s</em>".formatted(group.replace("*", "")));
     }
     
-    matcher = S.matcher(newText);
-    
+    matcher = STRIKE_THROUGH.matcher(text);
     while (matcher.find())
     {
       String group = matcher.group();
-      newText = newText.replace(group, "<s>%s</s>".formatted(group.replace("~~", "")));
+      text = text.replace(group, "<s>%s</s>".formatted(group.replace("~~", "")));
     }
     
-    matcher = U.matcher(newText);
-    
+    matcher = UNDERLINE.matcher(text);
     while (matcher.find())
     {
       String group = matcher.group();
-      newText = newText.replace(group, "<u>%s</u>".formatted(group.replace("__", "")));
+      text = text.replace(group, "<u>%s</u>".formatted(group.replace("__", "")));
     }
     
-    matcher = CODE_BLOCK.matcher(newText);
-    
-    boolean findCode = false;
-    
+    matcher = CODE_BLOCK.matcher(text);
     while (matcher.find())
     {
       String group = matcher.group();
-      newText = newText.replace(
-              group, "<div class=\"pre pre--multiline nohighlight\">%s</div>".formatted(group.replace("```", "")));
-      findCode = true;
+      text = text.replace(group, "<div class=\"pre pre--multiline nohighlight\">%s</div>".formatted(group.replace("```", "")));
+      foundCodeBlock = true;
     }
     
-    if (!findCode)
+    if (!foundCodeBlock)
     {
-      matcher = CODE_LINE.matcher(newText);
+      matcher = CODE_LINE.matcher(text);
       while (matcher.find())
       {
         String group = matcher.group();
-        newText = newText.replace(group, "<span class=\"pre pre--inline\">%s</span>".formatted(group.replace("`", "")));
+        text = text.replace(group, "<span class=\"pre pre--inline\">%s</span>".formatted(group.replace("`", "")));
       }
     }
-    matcher = NEW_LINE.matcher(newText);
+    
+    matcher = LINE_BREAK.matcher(text);
     while (matcher.find())
     {
-      newText = newText.replace(matcher.group(), "<br />");
+      text = text.replace(matcher.group(), "<br>");
     }
-    return newText;
+    
+    return text;
   }
   
   public static String toHex(Color color)
   {
     String hex = Integer.toHexString(color.getRGB() & 0xffffff);
-    while (hex.length() < 6)
-    {
-      hex = "0%s".formatted(hex);
-    }
+    
+    while (hex.length() < 6) {hex = "0%s".formatted(hex);}
+    
     return hex;
   }
 }

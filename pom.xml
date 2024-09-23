@@ -47,7 +47,7 @@
 
       <plugin>
         <artifactId>maven-deploy-plugin</artifactId>
-        <version>4.0.0-beta-1</version>
+        <version>3.1.3</version>
         <configuration>
           <altDeploymentRepository>
             internal.repo::default::file://${project.build.directory}/mvn-artifact
@@ -60,9 +60,8 @@
       </plugin>
 
       <plugin>
-        <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-source-plugin</artifactId>
-        <version>4.0.0-beta-1</version>
+        <version>3.3.1</version>
 
         <executions>
           <execution>
@@ -75,7 +74,6 @@
       </plugin>
 
       <plugin>
-        <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-compiler-plugin</artifactId>
         <version>3.13.0</version>
 
@@ -106,25 +104,6 @@
       <groupId>org.jsoup</groupId>
       <artifactId>jsoup</artifactId>
       <version>1.18.1</version>
-    </dependency>
-
-    <dependency>
-      <groupId>org.apache.maven.plugins</groupId>
-      <artifactId>maven-deploy-plugin</artifactId>
-      <version>3.1.1</version>
-    </dependency>
-
-    <dependency>
-      <groupId>org.apache.maven.plugins</groupId>
-      <artifactId>maven-source-plugin</artifactId>
-      <version>3.3.1</version>
-    </dependency>
-
-    <dependency>
-      <groupId>org.apache.maven.plugins</groupId>
-      <artifactId>maven-compiler-plugin</artifactId>
-      <version>4.0.0-beta-1</version>
-      <type>maven-plugin</type>
     </dependency>
   </dependencies>
 

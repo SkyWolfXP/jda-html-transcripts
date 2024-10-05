@@ -24,30 +24,21 @@ HTML Template stolen from [DiscordChatExporter](https://github.com/Tyrrrz/Discor
 
 ```xml
 <dependency>
-    <groupId>com.github.SkyWolfXP</groupId>
+    <groupId>com.github.skywolfxp</groupId>
     <artifactId>jda-html-transcripts</artifactId>
     <version>VERSION</version>
 </dependency>
 ```
 
-## Example Output
+## Usage
+
+### Using JDA's built in message fetcher
+
+```java
+FileUpload transcript = new Transcript().createTranscript(textChannel);
+```
+
+## Output
 
 ![output](https://img.derock.dev/5f5q0a.png)
 
-## Usage
-
-### Example usage using the built in message fetcher.
-
-```java
-DiscordHtmlTranscripts transcript = DiscordHtmlTranscripts.getInstance();
-
-transcript.createTranscript(textChannel);
-```
-
-### Or if you prefer, you can pass in your own messages.
-
-```java
-DiscordHtmlTranscripts transcript = DiscordHtmlTranscripts.getInstance();
-
-transcript.generateFromMessages(messages); // return to InputStream
-```
